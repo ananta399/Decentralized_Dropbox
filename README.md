@@ -12,3 +12,4 @@
        First it prompts to enter server name, which can for example be flume.cs.dartmouth.edu
        It connects to the tracker and sends a "REGISTER" signal and keeps on receiving data fro the tracker.
        Meanwhile another thread "keepAlive" periodically sends heartbeat to the tracker.
+
