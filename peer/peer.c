@@ -65,19 +65,8 @@ void add_watches(int fd, char *root)
         exit(0);
     }
 
-    /* add watch to starting directory */
-    wd = inotify_add_watch(fd, root, IN_CREATE | IN_DELETE | IN_CLOSE_WRITE);//);
-    /*wd = inotify_add_watch(fd, files[0], IN_CREATE | IN_DELETE | IN_CLOSE_WRITE);//);
-    if (wd == -1)
-    {
-        printf("Couldn't add watch to %s\n",files[0]);
-    }
-    wd = inotify_add_watch(fd, files[1], IN_CREATE | IN_DELETE | IN_CLOSE_WRITE);//);
-
-    if (wd == -1)
-    {
-        printf("Couldn't add watch to %s\n",files[1]);
-    }*/
+    /* add watch to starting directory to track changes*/
+    wd = inotify_add_watch(fd, root, IN_CREATE | IN_DELETE | IN_CLOSE_WRITE);
     if (wd == -1)
     {
         printf("Couldn't add watch to %s\n",root);
@@ -104,12 +93,17 @@ void add_watches(int fd, char *root)
             else
                 printf("Watching:: %s\n",abs_dir);
         }
-    }*/
+    }
+
+
+    free(abs_dir);
+    */
 
     closedir(dp);
-//    free(abs_dir);
+
 }
 
+//Main function
 int main(const int argc, char *argv[])
 {
 	int sock_fd;
@@ -121,7 +115,8 @@ int main(const int argc, char *argv[])
     sendtotracker_mutex = malloc( sizeof(pthread_mutex_t) );
     pthread_mutex_init(sendtotracker_mutex,NULL);
 
-    // // choose a node to connect
+    //Mode 1
+    // choose a node to connect
     char hostname[50];
     printf("Enter server name to connect:");
     scanf("%s", hostname);
@@ -133,6 +128,7 @@ int main(const int argc, char *argv[])
     }
     char* ip = inet_ntoa(*((struct in_addr *) host->h_addr_list[0]));
 
+    //Mode 2
     // choose an IP to connect
     // char hostname[50];
     // printf("Enter server IP to connect:");
@@ -149,12 +145,9 @@ int main(const int argc, char *argv[])
     }
     printf("\n\n%s\n","Peer Socket created" );
 
-
     memset(&address, '0', sizeof(address));
     address.sin_family = AF_INET;
     address.sin_port = htons(TRACKER_PORT);
-
-
 
 
    // Convert IPv4 addresses from IP to binary form and pack it
@@ -177,15 +170,14 @@ int main(const int argc, char *argv[])
         //downloadFromPeer();
     }
 
+    //Create monitoring and listening threads
     pthread_t monitor_thread;
-    // file dummies;
-    /*files[0] = "DROPBOX/overlay.c";
-    files[1] = "DROPBOX/1.odt";*/
     pthread_create(&monitor_thread, NULL, monitor, (void *) 0);
     pthread_t listentopeer_thread;
     pthread_create(&listentopeer_thread, NULL, listen_to_peer, (void *) 0);
     talkto_tracker();
 
+    //keep thread alive
     while(1){
         sleep(10);
     }
@@ -196,6 +188,7 @@ int main(const int argc, char *argv[])
 	
 }
 
+//Checks if the given file name is in the DROPBOX directory
 bool inDirectory(char * file_name ,int name_size)
 {
 	struct dirent *DIRentry;
@@ -207,9 +200,6 @@ bool inDirectory(char * file_name ,int name_size)
 		printf("Could not open dropbox root directory" );
 		return NULL;
 	}
-//    fileTable_t *localFileTable = create_fileTable();
-//    // printf("file number %d \n", get_number_of_files());
-
 
 	while ((DIRentry = readdir(DIRp)) != NULL) {
 		int size = get_file_size(DIRentry->d_name);
@@ -226,6 +216,7 @@ bool inDirectory(char * file_name ,int name_size)
 	return false;
 }
 
+//Removes the given file from the list of current downloads
 void removeFromCurrentDownloads(char * file_name, char * file_name_size)
 {
     for(int i = 0 ; i < MAX_CONCURRENT_DOWNLOADS; i++)
@@ -241,6 +232,7 @@ void removeFromCurrentDownloads(char * file_name, char * file_name_size)
     }
 }
 
+//Checks if the given file is in the list of current downloads
 bool isInCurrentDownloads(char * file_name, char * file_name_size)
 {
     for(int i = 0 ; i < MAX_CONCURRENT_DOWNLOADS; i++)
@@ -257,7 +249,7 @@ bool isInCurrentDownloads(char * file_name, char * file_name_size)
 
 }
 
-
+//Checks if the given file is in the filetable
 bool CheckInFileTable(char * current_file_name,struct fileTable file_table)
 {
    char temp[FILE_NAME_LEN];
@@ -267,7 +259,6 @@ bool CheckInFileTable(char * current_file_name,struct fileTable file_table)
 	int i;
 
 	num = file_table.numfiles;
-
 
 	for (i = 0; i < num; i++) {
 
@@ -347,6 +338,7 @@ void get_all_files_locally()
     closedir(DIRp);
 }
 
+//Deletes the given file from local directory
 void remove_locally(char * file_name, int file_size){
     char root[MAX_LEN];
     strcpy(root,DIRECTORY_NAME);
@@ -361,6 +353,7 @@ void remove_locally(char * file_name, int file_size){
     }
 }
 
+//Handles the connection with the tracker
 void talkto_tracker(){
 
 
@@ -371,7 +364,6 @@ void talkto_tracker(){
         peer_downloads[i]=NULL;
     }
     segtosend->type = REGISTER;
-    //printf("%s\n","SENDING REGISTER" );
     pthread_mutex_lock(sendtotracker_mutex); 
     send(tracker_connection , segtosend , sizeof(ptp_peer_t), 0 );
     pthread_mutex_unlock(sendtotracker_mutex);
@@ -380,7 +372,7 @@ void talkto_tracker(){
     //Create an heartbeat thread (keepAlive)
     pthread_t heartbeat_thread;
     pthread_create(&heartbeat_thread, NULL, keepAlive, (void *) &tracker_connection);
-printf("Size of ptp peer is %ld\n", sizeof(ptp_peer_t));
+    printf("Size of ptp peer is %ld\n", sizeof(ptp_peer_t));
     printf("Size is ptp tracker is %ld\n", sizeof(ptp_tracker_t));
     ptp_tracker_t* receivedseg = malloc(sizeof(ptp_tracker_t) );
 
@@ -470,37 +462,12 @@ printf("Size of ptp peer is %ld\n", sizeof(ptp_peer_t));
                 free(segtosend);
             }
         }
-//        struct dirent *DIRentry;  // Pointer for directory entry
-//// 	// chdir("/Users/rossguju/Desktop/anon/CS60SP18/CS60-TeamDDOS-DropBox/common");
-//
-//// 	DIR *DIRp = opendir(".");
-//
-//// 	if (DIRp == NULL)
-//// 	{
-//// 		printf("Could not open dropbox root directory" );
-//// 		return NULL;
-//// 	}
-//// 	fileTable_t *localFileTable = create_fileTable();
-//// 	// printf("file number %d \n", get_number_of_files());
-//
-//// 	while ((DIRentry = readdir(DIRp)) != NULL) {
-//
-//
-//
-//// 		int size = get_file_size(DIRentry->d_name);
-//
-//// 		if (node_insert(localFileTable, DIRentry->d_name, (size - 2), timestamp, ip_address)) {
-//
-//// 			continue;
-//// 		}
-//
-//// 	}
-//// 	closedir(DIRp);
 
     }
 
 }
 
+//Thread that constantly sends keepAlive signals to the tracker
 void* keepAlive(void* arg) {
 
     ptp_peer_t* segtosend = malloc(sizeof(ptp_peer_t) );
@@ -534,7 +501,7 @@ void peer_stop(){
     exit(1);
 }
 
-
+//Listens for other peers trying to connect to this peer
 void* listen_to_peer(){
 
     int SERV_PORT, list_sock, comm_sock;
@@ -600,20 +567,13 @@ void* listen_to_peer(){
                 return 1;
             }
             printf("Handling with thread %lu\n", thread_id);
-             
-          
-            // pthread_detach(thread_id);
 
         }
-    
-      // pthread_join( thread_id , NULL);     
-      // printf("Connection ended\n");
-      /* Note that if the server doesn't explicitly exit or close the socket,
-       * the socket will be closed when the program is killed or terminates. */    
     }
     close(list_sock);
 }
 
+//Thread to upload a file
 void *uploadThread(void *sock_desc){
   
     int fd, peer_sock;
@@ -624,9 +584,7 @@ void *uploadThread(void *sock_desc){
     char file_size[256];
 
     //get peer socker descriptor
-    peer_sock = *(int*)sock_desc;
-
-    
+    peer_sock = *(int*)sock_desc;    
 
     //read the file
     char filename[FILE_NAME_LEN];
@@ -637,16 +595,7 @@ void *uploadThread(void *sock_desc){
       return -1;
     }
 
-    printf("filename is %s\n",filename );
-
-
-    // fd = open(filename, O_RDONLY);
-    // if (fd == -1)
-    // {
-    //         fprintf(stderr, "Error opening file --> %s", strerror(errno));
-
-    //         exit(EXIT_FAILURE);
-    // }
+    printf("Trying to upload file: %s\n",filename );
 
     fp = fopen(filename, "r");
     if (fp == NULL){
@@ -656,10 +605,6 @@ void *uploadThread(void *sock_desc){
     fseek(fp,0,SEEK_END);
     int fileLen = ftell(fp);
     fseek(fp,0,SEEK_SET);
-    // char *buffer = (char*)malloc(fileLen);
-    // fread(buffer,fileLen,1,fp);
-    
-
 
     fprintf(stdout, "File Size: \n%d bytes\n", fileLen);
 
@@ -675,37 +620,9 @@ void *uploadThread(void *sock_desc){
 
     // offset = 0;
     remain_data = file_stat.st_size;
+
     /* Sending file data */
     int sent_bytes = 0;
-    // sent_bytes = sendfile(peer_sock, fd, &offset, FILETRANSFER_BUFSIZE);
-    // if (sent_bytes <= 0)
-    // {
-    //     // if (sent != 0)
-    //         perror("sendfile");
-    // }
-    // printf("sent %d bytes\n", sent_bytes);
-    // while (((sent_bytes = sendfile(peer_sock, fd, &offset, FILETRANSFER_BUFSIZE)) > 0) && (remain_data > 0))
-    // {
-    //         printf("in send while loop\n");
-    //         fprintf(stdout, "1. Server sent %d bytes from file's data, offset is now : %d and remaining data = %d\n", sent_bytes, offset, remain_data);
-    //         remain_data -= sent_bytes;
-    //         fprintf(stdout, "2. Server sent %d bytes from file's data, offset is now : %d and remaining data = %d\n", sent_bytes, offset, remain_data);
-    // }
-    // off_t offset = 0;
-    // while (remain_data > 0 )
-    // {
-    //     ssize_t sent = sendfile(peer_sock, fd, &offset, remain_data);
-    //     if (sent <= 0)
-    //     {
-    //         if (sent != 0)
-    //             perror("sendfile");
-    //         break;
-    //     }
-    //     printf("sent %d\n", sent );
-
-    //     offset += sent;
-    //     remain_data -= sent;
-    // }
 
     //Sending of actual data, byte by byte
     for (int i = 0; i < fileLen; i++){
@@ -725,6 +642,7 @@ void *uploadThread(void *sock_desc){
 
 }
 
+//Download the given file from the given peer
 void downloadFromPeer(struct in_addr peerIP, char *file_to_download, int filename_size){
 
         char hostname[50];
@@ -756,9 +674,6 @@ void downloadFromPeer(struct in_addr peerIP, char *file_to_download, int filenam
         memset(&address, '0', sizeof(address));
         address.sin_family = AF_INET;
         address.sin_port = htons(PEERTOPEER_PORT);
-
-
-
 
        // Convert IPv4 addresses from IP to binary form and pack it
         if(inet_pton(AF_INET, ip, &address.sin_addr)<=0) 
@@ -814,13 +729,7 @@ void downloadFromPeer(struct in_addr peerIP, char *file_to_download, int filenam
         int len;
         int bytes_received = 0;
         int bytes_to_receive = file_size_received;
-        // while((bytes_received = recv(sock_fd, buffer, bytes_to_receive, 0)) > 0 ) {
-        //    printf("in receive while loop\n");
-        //    fwrite(buffer, sizeof(char), bytes_received, received_file);
-        //    bytes_to_receive -= bytes_received;
-        //    fprintf(stdout, "Receive %d bytes and we hope :- %d bytes , remain data %d\n", bytes_received, bytes_to_receive, remain_data);
 
-        // }
         for (int i = 0; i < bytes_to_receive; i++){
             char c;
             recv(sock_fd, &c, 1,0 );
@@ -834,64 +743,7 @@ void downloadFromPeer(struct in_addr peerIP, char *file_to_download, int filenam
         removeFromCurrentDownloads(file_to_download, filename_size);
 }
 
-
-void file_modified( char * file_name)
-{
-    /*
-     * this is triggered locally when a file is modified by user him/herself
-     *
-     *
-     * */
-    char current_file_name[FILE_NAME_LEN];
-    memcpy(current_file_name, file_name, FILE_NAME_LEN  );
-    ptp_peer_t* segtosend = malloc(sizeof(ptp_peer_t) );
-    segtosend->type = FILE_UPDATE;
-    memcpy(segtosend->file_information.filename, current_file_name, FILE_NAME_LEN);
-    segtosend->file_information.status = MODIFIED;
-    segtosend->file_information.file_name_size = strlen(file_name);
-    send(tracker_connection , segtosend , sizeof(ptp_peer_t), 0 );
-    free(segtosend);
-}
-
-void file_created ( char * file_name)
-{
-    /*
-     * this is triggered locally when a file is created by user him/herself
-     *
-     *
-     * */
-    char current_file_name[FILE_NAME_LEN];
-    memcpy(current_file_name, file_name, sizeof(current_file_name)  );
-    printf("Comparing current filename %s", current_file_name);
-    ptp_peer_t* segtosend = malloc(sizeof(ptp_peer_t) );
-    segtosend->type = FILE_UPDATE;
-    memcpy(segtosend->file_information.filename, current_file_name, sizeof(current_file_name));
-    segtosend->file_information.latest_timestamp = time(NULL);
-    segtosend->file_information.status = ADDED;
-    segtosend->file_information.file_name_size = strlen(file_name);
-    send(tracker_connection , segtosend , sizeof(ptp_peer_t), 0 );
-    free(segtosend);
-}
-
-void file_deleted (char *file_name)
-{
-    /*
-     * this is triggered locally when a file is deleted by user him/herself
-     *
-     *
-     * */
-
-    char current_file_name[FILE_NAME_LEN];
-    memcpy(current_file_name, file_name, sizeof(current_file_name)  );
-    ptp_peer_t* segtosend = malloc(sizeof(ptp_peer_t) );
-    segtosend->type = FILE_UPDATE;
-    memcpy(segtosend->file_information.filename, current_file_name, sizeof(current_file_name));
-    segtosend->file_information.status = DELETED;
-    segtosend->file_information.file_name_size = strlen(file_name);
-    send(tracker_connection , segtosend , sizeof(ptp_peer_t), 0 );
-    free(segtosend);
-}
-
+//Monitors the local Directory for any changes
 void *monitor(void *arg) {
     // see if directory exists
     DIR* dir = opendir(DIRECTORY_NAME);
@@ -900,7 +752,6 @@ void *monitor(void *arg) {
     {
         /* Directory exists. */
         // update drop box directory
-        //update_drop_box_directory();
         const int event_size = sizeof(struct inotify_event);
         const int buf_len = 1024 * (event_size + FILENAME_MAX);
         int length, i = 0;
@@ -933,47 +784,6 @@ void *monitor(void *arg) {
         /* do it forever*/
         while(1)
         {
-
-            /*char buff[buf_len];
-            int no_of_events, count = 0;
-
-            no_of_events = read (fd, buff, buf_len);
-
-            while (count < no_of_events) {
-                struct inotify_event *event = (struct inotify_event *)&buff[count];
-
-
-                if (event->len){
-                    if (event->mask & IN_CLOSE_WRITE)
-                        if(!(event->mask & IN_ISDIR)){
-                            printf( "The file %s was modified done.\n", event->name );
-                            fflush(stdout);
-                        }
-                    if ( event->mask & IN_CREATE) {
-                        if (event->mask & IN_ISDIR)
-                            printf("DIR::%s CREATED\n", event->name );
-                        else
-                            printf("FILE::%s CREATED\n", event->name);
-                    }
-
-                    if ( event->mask & IN_MODIFY) {
-                        if (event->mask & IN_ISDIR)
-                            printf("DIR::%s MODIFIED\n",event->name );
-
-
-                    }
-
-                    if ( event->mask & IN_DELETE) {
-                        if (event->mask & IN_ISDIR)
-                            printf(" DIR::%s DELETED\n",event->name );
-                        else
-                            printf("FILE::%s DELETED\n", event->name );
-                    }
-                }
-                count += event_size + event->len;
-            }
-*/
-
             i = 0;
             length = read( fd, buffer, BUF_LEN );
 
@@ -1068,10 +878,8 @@ void *monitor(void *arg) {
     }
     else if (ENOENT == errno)
     {
-        //printf("here1 \n");
         /* Directory does not exist. */
         create_drop_box_directory();
-        //get_all_files();
     }
     else
     {
@@ -1082,7 +890,63 @@ void *monitor(void *arg) {
     return NULL;
 }
 
+//this is triggered locally when a file is modified by user him/herself
+void file_modified( char * file_name)
+{
+    /*
+     * this is triggered locally when a file is modified by user him/herself
+     *
+     *
+     * */
+    char current_file_name[FILE_NAME_LEN];
+    memcpy(current_file_name, file_name, FILE_NAME_LEN  );
+    ptp_peer_t* segtosend = malloc(sizeof(ptp_peer_t) );
+    segtosend->type = FILE_UPDATE;
+    memcpy(segtosend->file_information.filename, current_file_name, FILE_NAME_LEN);
+    segtosend->file_information.status = MODIFIED;
+    segtosend->file_information.file_name_size = strlen(file_name);
+    send(tracker_connection , segtosend , sizeof(ptp_peer_t), 0 );
+    free(segtosend);
+}
 
+void file_created ( char * file_name)
+{
+    /*
+     * this is triggered locally when a file is created by user him/herself
+     *
+     *
+     * */
+    char current_file_name[FILE_NAME_LEN];
+    memcpy(current_file_name, file_name, sizeof(current_file_name)  );
+    printf("Comparing current filename %s", current_file_name);
+    ptp_peer_t* segtosend = malloc(sizeof(ptp_peer_t) );
+    segtosend->type = FILE_UPDATE;
+    memcpy(segtosend->file_information.filename, current_file_name, sizeof(current_file_name));
+    segtosend->file_information.latest_timestamp = time(NULL);
+    segtosend->file_information.status = ADDED;
+    segtosend->file_information.file_name_size = strlen(file_name);
+    send(tracker_connection , segtosend , sizeof(ptp_peer_t), 0 );
+    free(segtosend);
+}
+
+void file_deleted (char *file_name)
+{
+    /*
+     * this is triggered locally when a file is deleted by user him/herself
+     *
+     *
+     * */
+
+    char current_file_name[FILE_NAME_LEN];
+    memcpy(current_file_name, file_name, sizeof(current_file_name)  );
+    ptp_peer_t* segtosend = malloc(sizeof(ptp_peer_t) );
+    segtosend->type = FILE_UPDATE;
+    memcpy(segtosend->file_information.filename, current_file_name, sizeof(current_file_name));
+    segtosend->file_information.status = DELETED;
+    segtosend->file_information.file_name_size = strlen(file_name);
+    send(tracker_connection , segtosend , sizeof(ptp_peer_t), 0 );
+    free(segtosend);
+}
 
 void *modify(void *arg) {
     modifying_global = false;

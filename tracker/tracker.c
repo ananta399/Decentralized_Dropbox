@@ -46,18 +46,6 @@ tracker_peer_t *tracker_side_peer_table[MAX_PEER_SLOTS]; // Tracker side Peer ta
 fileTable_t *global_filetable;
 
 pthread_mutex_t * filetable_mutex; //file_table mutex
-//pthread_create(HandShake thread) when new peer joins
-
-//Listen on handshake port
-
-
-
-//void *main_pthread();
-
-//Receive messages from a specific peer
-
-//If needed respond using peer-tracker handshake protocol (PTP)
-//
 
 //Initializes the tables and other stuff for tracker
 void tracker_init();
@@ -70,14 +58,7 @@ void* handshake(void* arg);
 //Remove dead peers if timeout occurs
 void *monitor_peers();
 
-// void tracker_recieve(tracker_table_t *table, seg_t *segmentBuffer);
-
-// void tracker_send(tracker_table_t *table, );
-
 int connect_to_peer();
-
-
-
 
 //Main thread: listen on the handshake port, 
 //and create a Handshake thread when a new peer joins.
@@ -93,8 +74,6 @@ int main()
 	printf("%s\n", "Starting up tracker main thread");
 
 	tracker_init();
-	//Create tracker table
-	// tracker_table_t *Table = trackertable_create();
 
 	//Open socket in TRACKER_PORT
 	listening_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -130,7 +109,7 @@ int main()
 		new_socket = accept(listening_socket_fd, (struct sockaddr *)&TrackerAddress, 
                        (socklen_t*)&addrlen);
 		if (new_socket < 0){
-			//printf("Error accepting a new connection\n");
+			printf("Error accepting a new connection\n");
 			break;
 		}
 
@@ -145,20 +124,8 @@ int main()
 		//Create a handshake thread
 		pthread_t handshake_thread;
 		pthread_create(&handshake_thread, NULL, handshake, (void *) toHandshakeThread);
-
-
-
-
 	}
 	
-
-
-
-
-
-
-
-
 }
 
 
